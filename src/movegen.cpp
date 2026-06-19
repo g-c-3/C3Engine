@@ -72,6 +72,8 @@ void generateMoves(Position& pos, Color color, bool forCheckTest, MoveList& list
     const int opp = 1 - ci;
     const Bitboard myOcc  = (ci == WHITE) ? pos.occW : pos.occB;
     const Bitboard oppOcc = (ci == WHITE) ? pos.occB : pos.occW;
+    (void)opp;
+    (void)oppOcc;
 
     // ── Pawns ────────────────────────────────────────────────────────────────
     {

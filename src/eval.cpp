@@ -665,7 +665,7 @@ static int evalKingSafety(const Position& pos, Color color, double phase) {
     if (!kBB) return 0;
     Square kSq   = bbLsb(kBB);
     int    kFile = kSq % 8;
-    int    kRow  = kSq / 8;
+    (void)(kSq / 8);  // kRow — computed here for potential future use; suppressed
 
     int danger = 0;
 
@@ -1873,7 +1873,6 @@ static int evalPassedPawnUrgency(const Position& pos, Color color) {
 static int evalSpaceControl(const Position& pos, Color color, double phase) {
     int ci  = color;
     int opp = 1 - ci;
-    Bitboard myOcc = (color == WHITE) ? pos.occW : pos.occB;
 
     // Target: opponent's half
     // White targets rows 0-3 (ranks 5-8), black targets rows 4-7 (ranks 1-4)

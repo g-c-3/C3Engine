@@ -36,10 +36,36 @@
 #include "types.h"
 #include "tt.h"
 
-// Fathom C header — must be in the include path (src/).
+// Fathom C header — only included when tbprobe.c is present in src/ and
+// CMake set C3_HAS_SYZYGY=1.  When Fathom is absent the entire syzygy.cpp
+// body is excluded by the outer #ifndef __EMSCRIPTEN__ guard combined with
+// the C3_HAS_SYZYGY guard below, so this header is never needed.
+#ifdef C3_HAS_SYZYGY
 extern "C" {
 #include "tbprobe.h"
 }
+#else
+// Fathom not present — provide the minimal stubs syzygy.cpp references so
+// the translation unit still compiles (functions are never called because
+// s_tbAvailable is always false without tb_init).
+static inline bool     tb_init(const char*)          { return false; }
+static inline void     tb_free()                     {}
+static inline unsigned tb_probe_wdl(uint64_t,uint64_t,uint64_t,uint64_t,
+                                    uint64_t,uint64_t,uint64_t,uint64_t,
+                                    unsigned,unsigned,unsigned,bool)
+                                                     { return 0xFFFFFFFFu; }
+static inline unsigned tb_probe_root(uint64_t,uint64_t,uint64_t,uint64_t,
+                                     uint64_t,uint64_t,uint64_t,uint64_t,
+                                     unsigned,unsigned,unsigned,bool,
+                                     unsigned*)      { return 0xFFFFFFFFu; }
+static constexpr unsigned TB_LARGEST        = 0;
+static constexpr unsigned TB_RESULT_FAILED  = 0xFFFFFFFFu;
+static constexpr unsigned TB_WIN            = 4;
+static constexpr unsigned TB_LOSS           = 0;
+static constexpr unsigned TB_DRAW           = 2;
+static constexpr unsigned TB_CURSED_WIN     = 3;
+static constexpr unsigned TB_BLESSED_LOSS   = 1;
+#endif
 
 #include <algorithm>
 #include <cstring>

@@ -272,9 +272,6 @@ int qsearch(Position& pos, SearchThread& st, int alpha, int beta, int ply, int q
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
 
-    // Delta pruning threshold — queen value + buffer
-    const int DELTA_MARGIN = MAT[QUEEN] + 50;
-
     // ── TT best move — legality validation + move-list caching ───────────────
     // ttGetBest returns only from/to/promo (the fields stored at ttStore time).
     // A TT entry can be stale in two ways:
@@ -340,8 +337,8 @@ int qsearch(Position& pos, SearchThread& st, int alpha, int beta, int ply, int q
             const PieceType cap = (mv.flags == EN_PASSANT) ? PAWN : mv.capturedType;
             const int captureGain = (cap != NO_PIECE_TYPE) ? MAT[cap] : 0;
             // Tight per-capture futility: skip if even the material gain + small
-            // buffer can't reach alpha. The broad DELTA_MARGIN check below was
-            // previously unreachable (DELTA_MARGIN > 100 always), so it is removed.
+            // buffer can't reach alpha. The broad queen-value check that was here
+            // previously was unreachable (queen value > 100 always), so it was removed.
             if (stand + captureGain + 100 < alpha) continue;
         }
 
