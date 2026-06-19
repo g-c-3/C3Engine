@@ -529,8 +529,8 @@ int alphaBeta(Position& pos,
         TBResult tbRes = syzygyProbeWDL(pos, ply, tbScore);
         if (tbRes != TBResult::NOT_IN_TB) {
             // Map result to a TT flag.
-            int tbFlag = (tbRes == TBResult::TB_WIN)  ? TT_LOWER :
-                         (tbRes == TBResult::TB_LOSS) ? TT_UPPER : TT_EXACT;
+            int tbFlag = (tbRes == TBResult::WIN)  ? TT_LOWER :
+                         (tbRes == TBResult::LOSS) ? TT_UPPER : TT_EXACT;
             ttStore(pos.zobristKey, depth, scoreToTT(tbScore, ply), tbFlag,
                     NO_SQUARE, NO_SQUARE, NO_PIECE_TYPE, isPvNode);
             return tbScore;

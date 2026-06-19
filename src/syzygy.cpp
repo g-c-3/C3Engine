@@ -236,19 +236,19 @@ TBResult syzygyProbeWDL(const Position& pos, int ply, int& score) {
     switch (wdl) {
         case TB_WIN:
             score = TB_WIN_SCORE - ply;
-            return TBResult::TB_WIN;
+            return TBResult::WIN;
         case TB_LOSS:
             score = -(TB_WIN_SCORE - ply);
-            return TBResult::TB_LOSS;
+            return TBResult::LOSS;
         case TB_CURSED_WIN:
             score = 0;  // treat as draw
-            return TBResult::TB_CURSED_WIN;
+            return TBResult::CURSED_WIN;
         case TB_BLESSED_LOSS:
             score = 0;  // treat as draw
-            return TBResult::TB_BLESSED_LOSS;
+            return TBResult::BLESSED_LOSS;
         default: // TB_DRAW
             score = 0;
-            return TBResult::TB_DRAW;
+            return TBResult::DRAW;
     }
 }
 

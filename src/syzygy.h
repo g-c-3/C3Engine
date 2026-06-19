@@ -76,11 +76,11 @@ constexpr int TB_WIN_SCORE = 800000;
 // ─── Probe results ─────────────────────────────────────────────────────────────
 enum class TBResult {
     NOT_IN_TB,
-    TB_DRAW,
-    TB_WIN,
-    TB_LOSS,
-    TB_CURSED_WIN,    // win but 50-move rule may save opponent (treat as draw)
-    TB_BLESSED_LOSS   // loss but 50-move rule may save us (treat as draw)
+    DRAW,
+    WIN,
+    LOSS,
+    CURSED_WIN,    // win but 50-move rule may save opponent (treat as draw)
+    BLESSED_LOSS   // loss but 50-move rule may save us (treat as draw)
 };
 
 #ifndef __EMSCRIPTEN__
