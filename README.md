@@ -4,7 +4,7 @@ Explore over 16.4 trillion unique chess starting positions with C3Engine, a powe
  * C3Engine — Chess Variant Game Engine
 ============================================================================
    
- * Copyright (c) G.C., India.
+ * Copyright (c) Gokul Chandar, India.
  * All rights reserved.
    
  * The variant game logic, opening position generation, rule adaptations and engine integration are original works authored by the owner.
