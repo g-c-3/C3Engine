@@ -1,29 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-# C3Engine — CI/CD build pipeline
-#
-# Triggers:
-#   • Every push to main / pull request into main → build + upload artifact
-#   • Every tag matching v* (e.g. v1.0.0) → build + create GitHub Release
-#
-# Jobs:
-#   build-native — GCC native build (UCI engine binary, Lazy SMP enabled)
-#                  Fast compile-check (~15 sec). Runs first on every push/PR.
-#                  Smoke tests: UCI handshake (uciok, id name, Threads,
-#                  MoveOverhead, SyzygyPath, Hash), Lazy SMP search (Threads=2,
-#                  bestmove, hashfull in info line).
-#
-#   build-wasm   — Emscripten WASM build (browser / Web Worker target)
-#                  Single-threaded only; C3_NO_SMP disables Lazy SMP.
-#                  Smoke tests: file size, copyright banner injection
-#                  (Gokul Chandar, 16.4 trillion opening positions),
-#                  Node.js UCI handshake (uciok, MoveOverhead, SyzygyPath;
-#                  confirms Threads option absent in WASM build).
-#
-# Release assets (tagged commits only, from build-wasm):
-#   • c3engine.js   — Emscripten glue script (includes copyright banner)
-#   • c3engine.wasm — WebAssembly binary
-# ═══════════════════════════════════════════════════════════════════════════════
-
 name: Build C3Engine
 
 on:
@@ -33,29 +7,25 @@ on:
   pull_request:
     branches: [main]
 
-# Only one concurrent build per branch; cancel in-progress runs on new push.
+# Cancel in-progress runs on new push to the same branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# ── Native build ──────────────────────────────────────────────────────────────
-# Fast compile-check + Lazy SMP smoke test. Runs on every push/PR.
-# Does not produce a release artifact — the WASM build is the deployable.
 jobs:
   build-native:
     name: Native (GCC, Lazy SMP)
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends cmake gcc g++ make
 
-      - name: CMake configure (native release)
+      - name: CMake configure
         run: |
           cmake -B build-native \
             -DCMAKE_BUILD_TYPE=Release \
@@ -65,29 +35,24 @@ jobs:
         run: cmake --build build-native --parallel $(nproc)
 
       - name: Smoke-test — UCI handshake
-        # Feed a minimal UCI handshake and verify the engine responds correctly.
-        # Checks confirm Lazy SMP, all new options, and core identity are present.
         run: |
           echo -e "uci\nquit" | timeout 5 ./build-native/c3engine | tee /tmp/uci_out.txt
-          grep -q "uciok"            /tmp/uci_out.txt || { echo "FAIL: no uciok";            exit 1; }
-          grep -q "id name C3Engine" /tmp/uci_out.txt || { echo "FAIL: no id name";          exit 1; }
-          grep -q "Threads"          /tmp/uci_out.txt || { echo "FAIL: no Threads option";   exit 1; }
-          grep -q "MoveOverhead"     /tmp/uci_out.txt || { echo "FAIL: no MoveOverhead";     exit 1; }
-          grep -q "SyzygyPath"       /tmp/uci_out.txt || { echo "FAIL: no SyzygyPath";       exit 1; }
-          grep -q "Hash"             /tmp/uci_out.txt || { echo "FAIL: no Hash option";      exit 1; }
+          grep -q "uciok"            /tmp/uci_out.txt || { echo "FAIL: no uciok";          exit 1; }
+          grep -q "id name C3Engine" /tmp/uci_out.txt || { echo "FAIL: no id name";        exit 1; }
+          grep -q "Threads"          /tmp/uci_out.txt || { echo "FAIL: no Threads option"; exit 1; }
+          grep -q "MoveOverhead"     /tmp/uci_out.txt || { echo "FAIL: no MoveOverhead";   exit 1; }
+          grep -q "SyzygyPath"       /tmp/uci_out.txt || { echo "FAIL: no SyzygyPath";     exit 1; }
+          grep -q "Hash"             /tmp/uci_out.txt || { echo "FAIL: no Hash option";    exit 1; }
           echo "UCI handshake OK"
 
       - name: Smoke-test — Lazy SMP search (Threads=2)
-        # Confirm a 2-thread search returns a bestmove without deadlock or crash.
-        # Also verify hashfull appears in the info line (present in original UCI output).
         run: |
           printf "uci\nisready\nsetoption name Threads value 2\nposition startpos\ngo movetime 500\nquit\n" \
             | timeout 10 ./build-native/c3engine | tee /tmp/smp_out.txt
-          grep -q "bestmove" /tmp/smp_out.txt  || { echo "FAIL: no bestmove from SMP search"; exit 1; }
-          grep -q "hashfull" /tmp/smp_out.txt  || { echo "FAIL: no hashfull in info line";    exit 1; }
+          grep -q "bestmove" /tmp/smp_out.txt || { echo "FAIL: no bestmove"; exit 1; }
+          grep -q "hashfull" /tmp/smp_out.txt || { echo "FAIL: no hashfull"; exit 1; }
           echo "Lazy SMP search OK"
 
-# ── WASM build ────────────────────────────────────────────────────────────────
   build-wasm:
     name: WASM (Emscripten ${{ vars.EMSDK_VERSION || '3.1.68' }})
     runs-on: ubuntu-24.04
@@ -99,11 +64,8 @@ jobs:
       BUILD_DIR: build-wasm
 
     steps:
-      # ── 1. Source ────────────────────────────────────────────────────────────
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ── 2. Emscripten SDK ────────────────────────────────────────────────────
       - name: Set up Emscripten SDK
         uses: mymindstorm/setup-emsdk@v14
         with:
@@ -114,7 +76,6 @@ jobs:
       - name: Verify emcc version
         run: emcc --version
 
-      # ── 3. Configure ─────────────────────────────────────────────────────────
       - name: CMake configure (Emscripten toolchain)
         run: |
           cmake -B $BUILD_DIR \
@@ -122,11 +83,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -G "Unix Makefiles"
 
-      # ── 4. Build ─────────────────────────────────────────────────────────────
       - name: Build
         run: cmake --build $BUILD_DIR --parallel $(nproc)
 
-      # ── 5. Sanity check ───────────────────────────────────────────────────────
       - name: Verify output files exist and are well-formed
         run: |
           ls -lh $BUILD_DIR/c3engine.js $BUILD_DIR/c3engine.wasm
@@ -135,29 +94,20 @@ jobs:
           WA_SIZE=$(stat -c%s "$BUILD_DIR/c3engine.wasm")
           echo "c3engine.js  : ${JS_SIZE} bytes"
           echo "c3engine.wasm: ${WA_SIZE} bytes"
-          [ "$JS_SIZE"  -ge "$MIN_BYTES" ] || { echo "c3engine.js too small!";   exit 1; }
-          [ "$WA_SIZE"  -ge "$MIN_BYTES" ] || { echo "c3engine.wasm too small!"; exit 1; }
+          [ "$JS_SIZE" -ge "$MIN_BYTES" ] || { echo "c3engine.js too small!";   exit 1; }
+          [ "$WA_SIZE" -ge "$MIN_BYTES" ] || { echo "c3engine.wasm too small!"; exit 1; }
 
-      - name: Verify copyright banner is present in glue file
-        # --pre-js should have injected the banner at the top of c3engine.js.
-        # Check for the copyright line and the opening-positions figure.
+      - name: Verify copyright banner
         run: |
-          grep -q "Gokul Chandar"          $BUILD_DIR/c3engine.js || { echo "FAIL: copyright missing";          exit 1; }
-          grep -q "16,435,321,302,500"     $BUILD_DIR/c3engine.js || { echo "FAIL: opening positions missing";  exit 1; }
-          grep -q "C3Engine"               $BUILD_DIR/c3engine.js || { echo "FAIL: engine name missing";        exit 1; }
+          grep -q "Gokul Chandar"      $BUILD_DIR/c3engine.js || { echo "FAIL: copyright missing";         exit 1; }
+          grep -q "16,435,321,302,500" $BUILD_DIR/c3engine.js || { echo "FAIL: opening positions missing"; exit 1; }
+          grep -q "C3Engine"           $BUILD_DIR/c3engine.js || { echo "FAIL: engine name missing";       exit 1; }
           echo "Banner injection OK"
 
       - name: WASM smoke-test (Node.js)
-        # Emscripten's output is a CommonJS module when MODULARIZE=1.
-        # We load it with Node.js, wait for the runtime to initialise (onRuntimeInitialized),
-        # send a UCI handshake via c3_uci_command, and verify 'uciok' is printed.
-        # Node.js is pre-installed on ubuntu-24.04 GitHub runners.
         run: |
           node - <<'EOF'
-          const path  = require('path');
-          const fs    = require('fs');
-
-          // Capture stdout lines emitted by the engine.
+          const path = require('path');
           const lines = [];
           const C3Engine = require(path.resolve('${{ env.BUILD_DIR }}/c3engine.js'));
 
@@ -168,17 +118,16 @@ jobs:
               cmd('uci');
               cmd('quit');
               const out = lines.join('\n');
-              if (!out.includes('uciok'))        { console.error('FAIL: no uciok');        process.exit(1); }
-              if (!out.includes('MoveOverhead')) { console.error('FAIL: no MoveOverhead'); process.exit(1); }
-              if (!out.includes('SyzygyPath'))   { console.error('FAIL: no SyzygyPath');   process.exit(1); }
-              // Threads option must NOT appear in WASM build (C3_NO_SMP)
-              if ( out.includes('option name Threads')) { console.error('FAIL: Threads leaked into WASM'); process.exit(1); }
+              if (!out.includes('uciok'))               { console.error('FAIL: no uciok');               process.exit(1); }
+              if (!out.includes('MoveOverhead'))         { console.error('FAIL: no MoveOverhead');         process.exit(1); }
+              if (!out.includes('SyzygyPath'))           { console.error('FAIL: no SyzygyPath');           process.exit(1); }
+              // Threads must be absent — WASM build is single-threaded (C3_NO_SMP).
+              if (out.includes('option name Threads'))   { console.error('FAIL: Threads in WASM build');   process.exit(1); }
               console.log('WASM UCI smoke-test OK');
             }
           });
           EOF
 
-      # ── 6. Upload artifact (every successful build) ───────────────────────────
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
         with:
@@ -189,7 +138,6 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      # ── 7. GitHub Release (tagged commits only) ───────────────────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
