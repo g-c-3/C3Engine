@@ -86,6 +86,18 @@ jobs:
       - name: Build
         run: cmake --build $BUILD_DIR --parallel $(nproc)
 
+      - name: Inject copyright banner
+        # Prepend the banner directly after the build since --pre-js placement
+        # varies across Emscripten versions. This is reliable regardless of version.
+        run: |
+          BANNER="src/c3engine_banner.js"
+          echo "Banner file exists: $(test -f $BANNER && echo YES || echo NO)"
+          cat $BANNER $BUILD_DIR/c3engine.js > /tmp/c3engine_patched.js
+          mv /tmp/c3engine_patched.js $BUILD_DIR/c3engine.js
+          cat $BANNER $BUILD_DIR/c3engine_single.js > /tmp/c3engine_single_patched.js
+          mv /tmp/c3engine_single_patched.js $BUILD_DIR/c3engine_single.js
+          echo "Banner injected. First line: $(head -1 $BUILD_DIR/c3engine.js)"
+
       - name: Prepare outputs
         # c3engine_single.js is the WASM-inlined standalone file — rename to
         # c3engine.min.js for clarity. Three final files:
