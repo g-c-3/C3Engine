@@ -126,18 +126,12 @@ if(EMSCRIPTEN)
 
         # Assertions off in release; set to 1 locally when debugging memory issues
         "SHELL:-s ASSERTIONS=0"
-
-        # ── Glue file banner comment ─────────────────────────────────────────────
-        # Emscripten's --pre-js prepends a raw JS file verbatim to c3engine.js
-        # before any generated code.  We generate the banner at configure time
-        # (see file(WRITE ...) below) and inject it here so the copyright notice,
-        # game rules, and acknowledgements appear at the very top of the glue file.
-        "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/c3engine_banner.js"
     )
 
     # ── Generate glue file banner ────────────────────────────────────────────────
-    # Written to the build directory at configure time so --pre-js can reference
-    # it.  Uses CMake's file(WRITE) so no external tool is needed.
+    # Banner is injected into the output JS files as a post-build step in CI
+    # (build.yml: "Inject copyright banner") by prepending c3engine_banner.js
+    # using cat. The file is written here at configure time so it is available.
     #
     # The banner is a JS block comment — safe to prepend to any Emscripten glue
     # file regardless of MODULARIZE mode.  It does not execute any code.
@@ -249,7 +243,6 @@ if(EMSCRIPTEN)
         "SHELL:-s NO_EXIT_RUNTIME=1"
         "SHELL:-s SINGLE_FILE=1"
         "SHELL:-s ASSERTIONS=0"
-        "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/c3engine_banner.js"
     )
 
 # ════════════════════════════════════════════════════════════════════════════════
