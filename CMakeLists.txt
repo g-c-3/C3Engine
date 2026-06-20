@@ -110,7 +110,7 @@ if(EMSCRIPTEN)
         "SHELL:-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8"
 
         # Web Worker environment — no window, no document
-        "SHELL:-s ENVIRONMENT=worker"
+        "SHELL:-s ENVIRONMENT=worker,node"
 
         # Wrap the output in a factory function so multiple instances are possible
         "SHELL:-s MODULARIZE=1"
@@ -237,7 +237,7 @@ if(EMSCRIPTEN)
         "SHELL:-s MALLOC=emmalloc"
         "SHELL:-s EXPORTED_FUNCTIONS=_main,_c3_uci_command,_c3_stop"
         "SHELL:-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8"
-        "SHELL:-s ENVIRONMENT=worker"
+        "SHELL:-s ENVIRONMENT=worker,node"
         "SHELL:-s MODULARIZE=1"
         "SHELL:-s EXPORT_NAME=C3Engine"
         "SHELL:-s NO_EXIT_RUNTIME=1"
