@@ -1,0 +1,171 @@
+name: Build C3Engine
+
+on:
+  push:
+    branches: [main]
+    tags:     ['v*']
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs on new push to the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-native:
+    name: Native (GCC, Lazy SMP)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake gcc g++ make
+
+      - name: Download Fathom (Syzygy tablebase library)
+        # Clone the full Fathom src/ directory — tbprobe.c includes tbchess.c
+        # and other files internally, so all must be present together.
+        run: |
+          git clone --depth=1 https://github.com/jdart1/Fathom.git /tmp/fathom
+          cp /tmp/fathom/src/* src/
+
+      - name: CMake configure
+        run: |
+          cmake -B build-native \
+            -DCMAKE_BUILD_TYPE=Release \
+            -G "Unix Makefiles"
+
+      - name: Build
+        run: cmake --build build-native --parallel $(nproc)
+
+      - name: Smoke-test — UCI handshake
+        run: |
+          echo -e "uci\nquit" | timeout 5 ./build-native/c3engine | tee /tmp/uci_out.txt
+          grep -q "uciok"            /tmp/uci_out.txt || { echo "FAIL: no uciok";          exit 1; }
+          grep -q "id name C3Engine" /tmp/uci_out.txt || { echo "FAIL: no id name";        exit 1; }
+          grep -q "Threads"          /tmp/uci_out.txt || { echo "FAIL: no Threads option"; exit 1; }
+          grep -q "MoveOverhead"     /tmp/uci_out.txt || { echo "FAIL: no MoveOverhead";   exit 1; }
+          grep -q "SyzygyPath"       /tmp/uci_out.txt || { echo "FAIL: no SyzygyPath";     exit 1; }
+          grep -q "Hash"             /tmp/uci_out.txt || { echo "FAIL: no Hash option";    exit 1; }
+          echo "UCI handshake OK"
+
+      - name: Smoke-test — Lazy SMP search (Threads=2)
+        run: |
+          printf "uci\nisready\nsetoption name Threads value 2\nposition startpos\ngo movetime 500\nquit\n" \
+            | timeout 10 ./build-native/c3engine | tee /tmp/smp_out.txt
+          grep -q "bestmove" /tmp/smp_out.txt || { echo "FAIL: no bestmove"; exit 1; }
+          grep -q "hashfull" /tmp/smp_out.txt || { echo "FAIL: no hashfull"; exit 1; }
+          echo "Lazy SMP search OK"
+
+  build-wasm:
+    name: WASM (Emscripten ${{ vars.EMSDK_VERSION || '3.1.68' }})
+    runs-on: ubuntu-24.04
+    # Run after native so a broken build fails fast on the cheaper job first.
+    needs: build-native
+
+    env:
+      EMSDK_VERSION: ${{ vars.EMSDK_VERSION || '3.1.68' }}
+      BUILD_DIR: build-wasm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: .emsdk-cache
+          no-cache: false
+
+      - name: Verify emcc version
+        run: emcc --version
+
+      - name: CMake configure (Emscripten toolchain)
+        run: |
+          cmake -B $BUILD_DIR \
+            -DCMAKE_TOOLCHAIN_FILE="${EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -G "Unix Makefiles"
+
+      - name: Build
+        run: cmake --build $BUILD_DIR --parallel $(nproc)
+
+      - name: Prepare outputs
+        # c3engine_single.js is the WASM-inlined standalone file — rename to
+        # c3engine.min.js for clarity. Three final files:
+        #   c3engine.js       — glue script (loads c3engine.wasm separately)
+        #   c3engine.wasm     — WebAssembly binary
+        #   c3engine.min.js   — standalone JS, no .wasm fetch needed
+        run: |
+          mv $BUILD_DIR/c3engine_single.js $BUILD_DIR/c3engine.min.js
+          echo "Output files:"
+          ls -lh $BUILD_DIR/c3engine.js $BUILD_DIR/c3engine.wasm $BUILD_DIR/c3engine.min.js
+
+      - name: Verify output files exist and are well-formed
+        run: |
+          ls -lh $BUILD_DIR/c3engine.js $BUILD_DIR/c3engine.wasm
+          MIN_BYTES=10240
+          JS_SIZE=$(stat -c%s "$BUILD_DIR/c3engine.js")
+          WA_SIZE=$(stat -c%s "$BUILD_DIR/c3engine.wasm")
+          echo "c3engine.js  : ${JS_SIZE} bytes"
+          echo "c3engine.wasm: ${WA_SIZE} bytes"
+          [ "$JS_SIZE" -ge "$MIN_BYTES" ] || { echo "c3engine.js too small!";   exit 1; }
+          [ "$WA_SIZE" -ge "$MIN_BYTES" ] || { echo "c3engine.wasm too small!"; exit 1; }
+
+      - name: Verify copyright banner
+        run: |
+          grep -q "Gokul Chandar"      $BUILD_DIR/c3engine.js || { echo "FAIL: copyright missing";         exit 1; }
+          grep -q "16,435,321,302,500" $BUILD_DIR/c3engine.js || { echo "FAIL: opening positions missing"; exit 1; }
+          grep -q "C3Engine"           $BUILD_DIR/c3engine.js || { echo "FAIL: engine name missing";       exit 1; }
+          echo "Banner injection OK"
+
+      - name: WASM smoke-test (Node.js)
+        run: |
+          node - <<'EOF'
+          const path = require('path');
+          const lines = [];
+          const C3Engine = require(path.resolve('${{ env.BUILD_DIR }}/c3engine.js'));
+
+          C3Engine({
+            print: (line) => { lines.push(line); },
+            onRuntimeInitialized: function() {
+              const cmd = this.cwrap('c3_uci_command', null, ['string']);
+              cmd('uci');
+              cmd('quit');
+              const out = lines.join('\n');
+              if (!out.includes('uciok'))               { console.error('FAIL: no uciok');               process.exit(1); }
+              if (!out.includes('MoveOverhead'))         { console.error('FAIL: no MoveOverhead');         process.exit(1); }
+              if (!out.includes('SyzygyPath'))           { console.error('FAIL: no SyzygyPath');           process.exit(1); }
+              // Threads must be absent — WASM build is single-threaded (C3_NO_SMP).
+              if (out.includes('option name Threads'))   { console.error('FAIL: Threads in WASM build');   process.exit(1); }
+              console.log('WASM UCI smoke-test OK');
+            }
+          });
+          EOF
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c3engine-wasm-${{ github.sha }}
+          path: |
+            ${{ env.BUILD_DIR }}/c3engine.js
+            ${{ env.BUILD_DIR }}/c3engine.min.js
+            ${{ env.BUILD_DIR }}/c3engine.wasm
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.BUILD_DIR }}/c3engine.js
+            ${{ env.BUILD_DIR }}/c3engine.min.js
+            ${{ env.BUILD_DIR }}/c3engine.wasm
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
