@@ -130,6 +130,9 @@ jobs:
       - name: WASM smoke-test (Node.js)
         run: |
           node - <<'EOF'
+          // Polyfill 'self' for Emscripten worker+node environment
+          if (typeof self === 'undefined') { global.self = global; }
+
           const path = require('path');
           const lines = [];
           const C3Engine = require(path.resolve('${{ env.BUILD_DIR }}/c3engine.js'));
@@ -141,11 +144,11 @@ jobs:
               cmd('uci');
               cmd('quit');
               const out = lines.join('\n');
-              if (!out.includes('uciok'))               { console.error('FAIL: no uciok');               process.exit(1); }
-              if (!out.includes('MoveOverhead'))         { console.error('FAIL: no MoveOverhead');         process.exit(1); }
-              if (!out.includes('SyzygyPath'))           { console.error('FAIL: no SyzygyPath');           process.exit(1); }
+              if (!out.includes('uciok'))             { console.error('FAIL: no uciok');             process.exit(1); }
+              if (!out.includes('MoveOverhead'))       { console.error('FAIL: no MoveOverhead');       process.exit(1); }
+              if (!out.includes('SyzygyPath'))         { console.error('FAIL: no SyzygyPath');         process.exit(1); }
               // Threads must be absent — WASM build is single-threaded (C3_NO_SMP).
-              if (out.includes('option name Threads'))   { console.error('FAIL: Threads in WASM build');   process.exit(1); }
+              if (out.includes('option name Threads')) { console.error('FAIL: Threads in WASM build'); process.exit(1); }
               console.log('WASM UCI smoke-test OK');
             }
           });
