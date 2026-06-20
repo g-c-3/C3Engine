@@ -26,15 +26,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends cmake gcc g++ make
 
       - name: Download Fathom (Syzygy tablebase library)
-        # Fathom ships multiple interdependent headers (tbprobe.h, tbconfig.h,
-        # stdendian.h, etc.). Fetch the exact files needed directly from the
-        # canonical repo rather than vendoring them all.
+        # Clone the full Fathom src/ directory — tbprobe.c includes tbchess.c
+        # and other files internally, so all must be present together.
         run: |
-          FATHOM_URL="https://raw.githubusercontent.com/jdart1/Fathom/master/src"
-          curl -sSfL "$FATHOM_URL/tbprobe.c"    -o src/tbprobe.c
-          curl -sSfL "$FATHOM_URL/tbprobe.h"    -o src/tbprobe.h
-          curl -sSfL "$FATHOM_URL/tbconfig.h"   -o src/tbconfig.h
-          curl -sSfL "$FATHOM_URL/stdendian.h"  -o src/stdendian.h
+          git clone --depth=1 https://github.com/jdart1/Fathom.git /tmp/fathom
+          cp /tmp/fathom/src/* src/
 
       - name: CMake configure
         run: |
@@ -97,6 +93,17 @@ jobs:
       - name: Build
         run: cmake --build $BUILD_DIR --parallel $(nproc)
 
+      - name: Prepare outputs
+        # c3engine_single.js is the WASM-inlined standalone file — rename to
+        # c3engine.min.js for clarity. Three final files:
+        #   c3engine.js       — glue script (loads c3engine.wasm separately)
+        #   c3engine.wasm     — WebAssembly binary
+        #   c3engine.min.js   — standalone JS, no .wasm fetch needed
+        run: |
+          mv $BUILD_DIR/c3engine_single.js $BUILD_DIR/c3engine.min.js
+          echo "Output files:"
+          ls -lh $BUILD_DIR/c3engine.js $BUILD_DIR/c3engine.wasm $BUILD_DIR/c3engine.min.js
+
       - name: Verify output files exist and are well-formed
         run: |
           ls -lh $BUILD_DIR/c3engine.js $BUILD_DIR/c3engine.wasm
@@ -145,6 +152,7 @@ jobs:
           name: c3engine-wasm-${{ github.sha }}
           path: |
             ${{ env.BUILD_DIR }}/c3engine.js
+            ${{ env.BUILD_DIR }}/c3engine.min.js
             ${{ env.BUILD_DIR }}/c3engine.wasm
           retention-days: 30
           if-no-files-found: error
@@ -155,6 +163,7 @@ jobs:
         with:
           files: |
             ${{ env.BUILD_DIR }}/c3engine.js
+            ${{ env.BUILD_DIR }}/c3engine.min.js
             ${{ env.BUILD_DIR }}/c3engine.wasm
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
