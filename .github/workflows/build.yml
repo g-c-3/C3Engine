@@ -47,7 +47,7 @@ jobs:
 
       - name: Smoke-test — Lazy SMP search (Threads=2)
         run: |
-          printf "uci\nisready\nsetoption name Threads value 2\nposition startpos\ngo movetime 500\nquit\n" \
+          printf "uci\nisready\nsetoption name Threads value 2\nposition startpos moves e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 f3g5 d7d5 e4d5 c6a5\ngo movetime 500\nquit\n" \
             | timeout 10 ./build-native/c3engine | tee /tmp/smp_out.txt
           grep -q "bestmove" /tmp/smp_out.txt || { echo "FAIL: no bestmove"; exit 1; }
           grep -q "hashfull" /tmp/smp_out.txt || { echo "FAIL: no hashfull"; exit 1; }
