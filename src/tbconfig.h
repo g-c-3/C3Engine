@@ -1,30 +1,28 @@
 /*
- * tbconfig.h — Minimal Fathom configuration for C3Engine
+ * tbconfig.h — Fathom configuration for C3Engine
  *
- * Fathom (tbprobe.h) requires this header to be present in the include path.
- * All defaults are suitable for C3Engine's usage:
- *   - Single TB_MAX_PIECE limit handled at runtime via TB_LARGEST
- *   - No popcount override (compiler intrinsics used)
- *   - No custom memory allocator
+ * These constants must match what tbprobe.c expects internally.
+ * Values mirror those used by Stockfish's Fathom integration.
  */
 
 #ifndef TBCONFIG_H
 #define TBCONFIG_H
 
-/* Maximum number of pieces supported (including kings).
- * 7 covers all publicly available Syzygy TBs (up to 7-piece).
- * Reduce to 6 if only 6-piece TBs are used, to save memory. */
+/* Maximum pieces supported (including kings). 7 = all public Syzygy TBs. */
 #define TB_PIECES 7
 
-/* Use the compiler's built-in popcount instruction.
- * GCC/Clang on x86-64 maps this to POPCNT via -march=native. */
+/* Use compiler built-in popcount */
 #define TB_USE_POPCNT 1
 
-/* No custom malloc/free — use standard C library. */
+/* No custom allocator — use standard malloc/free */
 /* #define TB_MALLOC  my_malloc */
 /* #define TB_FREE    my_free  */
 
-/* No hash table size override — use Fathom's default. */
-/* #define TB_HASH_BITS 12 */
+/* Score constants required by tbprobe.c internal functions */
+#define TB_VALUE_INFINITE  32767
+#define TB_VALUE_MATE      32000
+#define TB_VALUE_DRAW      0
+#define TB_VALUE_PAWN      100
+#define TB_MAX_MATE_PLY    127
 
 #endif /* TBCONFIG_H */
