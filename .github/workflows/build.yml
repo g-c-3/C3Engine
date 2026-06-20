@@ -110,10 +110,6 @@ jobs:
 
       - name: Verify copyright banner
         run: |
-          echo "--- First 5 lines of c3engine.js ---"
-          head -5 $BUILD_DIR/c3engine.js
-          echo "--- Searching for Gokul ---"
-          grep -c "Gokul" $BUILD_DIR/c3engine.js || echo "Not found"
           grep -q "Gokul Chandar"      $BUILD_DIR/c3engine.js || { echo "FAIL: copyright missing";         exit 1; }
           grep -q "16,435,321,302,500" $BUILD_DIR/c3engine.js || { echo "FAIL: opening positions missing"; exit 1; }
           grep -q "C3Engine"           $BUILD_DIR/c3engine.js || { echo "FAIL: engine name missing";       exit 1; }
