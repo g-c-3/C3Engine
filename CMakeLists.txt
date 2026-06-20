@@ -132,7 +132,7 @@ if(EMSCRIPTEN)
         # before any generated code.  We generate the banner at configure time
         # (see file(WRITE ...) below) and inject it here so the copyright notice,
         # game rules, and acknowledgements appear at the very top of the glue file.
-        "SHELL:--pre-js ${CMAKE_CURRENT_BINARY_DIR}/c3engine_banner.js"
+        "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/c3engine_banner.js"
     )
 
     # ── Generate glue file banner ────────────────────────────────────────────────
@@ -141,7 +141,7 @@ if(EMSCRIPTEN)
     #
     # The banner is a JS block comment — safe to prepend to any Emscripten glue
     # file regardless of MODULARIZE mode.  It does not execute any code.
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/c3engine_banner.js"
+    file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/src/c3engine_banner.js"
 "/*\n\
  * ============================================================================\n\
  * C3Engine — Chess Variant Game Engine\n\
@@ -249,7 +249,7 @@ if(EMSCRIPTEN)
         "SHELL:-s NO_EXIT_RUNTIME=1"
         "SHELL:-s SINGLE_FILE=1"
         "SHELL:-s ASSERTIONS=0"
-        "SHELL:--pre-js ${CMAKE_CURRENT_BINARY_DIR}/c3engine_banner.js"
+        "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/c3engine_banner.js"
     )
 
 # ════════════════════════════════════════════════════════════════════════════════
