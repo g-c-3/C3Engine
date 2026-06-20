@@ -216,6 +216,42 @@ if(EMSCRIPTEN)
  */\n"
     )
 
+    # ── Single-file target (standalone JS with inlined WASM) ─────────────────────
+    # c3engine_single.js has the WASM binary base64-inlined — no separate .wasm
+    # fetch needed. Used to produce the standalone c3engine.min.js output.
+    add_executable(c3engine_single ${SOURCES})
+    target_include_directories(c3engine_single PRIVATE src)
+
+    target_compile_options(c3engine_single PRIVATE
+        -O3 -DNDEBUG -fno-rtti -fno-exceptions
+        -DC3_NO_SMP
+        -Wno-pthreads-mem-growth
+    )
+
+    set_target_properties(c3engine_single PROPERTIES
+        OUTPUT_NAME "c3engine_single"
+        SUFFIX ".js"
+    )
+
+    target_link_options(c3engine_single PRIVATE
+        -O3
+        "SHELL:-s WASM=1"
+        "SHELL:-s ALLOW_MEMORY_GROWTH=1"
+        "SHELL:-s INITIAL_MEMORY=33554432"
+        "SHELL:-s MAXIMUM_MEMORY=536870912"
+        "SHELL:-s STACK_SIZE=1048576"
+        "SHELL:-s MALLOC=emmalloc"
+        "SHELL:-s EXPORTED_FUNCTIONS=_main,_c3_uci_command,_c3_stop"
+        "SHELL:-s EXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,lengthBytesUTF8"
+        "SHELL:-s ENVIRONMENT=worker"
+        "SHELL:-s MODULARIZE=1"
+        "SHELL:-s EXPORT_NAME=C3Engine"
+        "SHELL:-s NO_EXIT_RUNTIME=1"
+        "SHELL:-s SINGLE_FILE=1"
+        "SHELL:-s ASSERTIONS=0"
+        "SHELL:--pre-js ${CMAKE_CURRENT_BINARY_DIR}/c3engine_banner.js"
+    )
+
 # ════════════════════════════════════════════════════════════════════════════════
 # Native build  (cmake -DCMAKE_BUILD_TYPE=Release)
 # ════════════════════════════════════════════════════════════════════════════════
@@ -286,6 +322,7 @@ if(EMSCRIPTEN)
     install(FILES
         "${CMAKE_BINARY_DIR}/c3engine.js"
         "${CMAKE_BINARY_DIR}/c3engine.wasm"
+        "${CMAKE_BINARY_DIR}/c3engine_single.js"
         DESTINATION dist
     )
 endif()
